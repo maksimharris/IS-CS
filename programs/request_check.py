@@ -5,12 +5,12 @@ import sys
 from datetime import timedelta
 
 КОРЕНЬ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(КОРЕНЬ, "данные"))
-sys.path.insert(0, os.path.join(КОРЕНЬ, "программы"))
-from проверка_страны import проверить_страну
-from заявки_на_передачу import заявки
+sys.path.insert(0, os.path.join(КОРЕНЬ, "data"))
+sys.path.insert(0, os.path.join(КОРЕНЬ, "programs"))
+from country_check import проверить_страну
+from transfer_requests import заявки
 
-ФАЙЛ_ОТЧЁТА = os.path.join(КОРЕНЬ, "отчёты", "отчёт_по_передаче.txt")
+ФАЙЛ_ОТЧЁТА = os.path.join(КОРЕНЬ, "reports", "transfer_report.txt")
 ОСОБЫЕ_ВИДЫ = ("специальные", "биометрические")
 
 
