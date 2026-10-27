@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
-"""Три намеренно заложенных нарушения (учебный аудит)."""
+"""Three deliberately planted violations (training audit)."""
 
-нарушения = {
+violations = {
     "список": [
         {
             "номер": 1,

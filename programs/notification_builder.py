@@ -1,55 +1,55 @@
 # -*- coding: utf-8 -*-
-"""Задание 4.1. Формирование уведомления в Роскомнадзор по ч. 3.1 ст. 21 152-ФЗ."""
+"""Task 4.1. Creating a notification to Roskomnadzor under Art. 21 p. 3.1 of 152-FZ."""
 import os
 from datetime import datetime
 
-КОРЕНЬ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ШАБЛОН = os.path.join(КОРЕНЬ, "data", "documents", "breach_notification.txt")
-СРОК_ПЕРВИЧНОГО_ЧАСОВ = 24
-СРОК_ДОПОЛНИТЕЛЬНОГО_ЧАСОВ = 72
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+TEMPLATE = os.path.join(ROOT, "data", "documents", "breach_notification.txt")
+INITIAL_DEADLINE_HOURS = 24
+FOLLOWUP_DEADLINE_HOURS = 72
 
 
-def определить_вид(дата_обнаружения, сейчас):
-    """В течение 24 часов с обнаружения — первичное уведомление; позже — дополнительное (результаты расследования, до 72 ч)."""
-    прошло = (сейчас - дата_обнаружения).total_seconds() / 3600
-    вид = "первичное" if прошло <= СРОК_ПЕРВИЧНОГО_ЧАСОВ else "дополнительное"
-    return вид, прошло
+def determine_kind(detection_date, now):
+    """Within 24 hours of detection - initial notification; later - follow-up (investigation results, within 72 h)."""
+    elapsed = (now - detection_date).total_seconds() / 3600
+    kind = "первичное" if elapsed <= INITIAL_DEADLINE_HOURS else "дополнительное"
+    return kind, elapsed
 
 
-def создать_уведомление(сведения, путь_к_файлу, сейчас=None, ответственный="Лисицына Анна Валерьевна"):
-    """Формирует файл уведомления. Возвращает вид уведомления и список замечаний по срокам."""
-    сейчас = сейчас or datetime.now()
-    обнаружено = сведения["дата и время обнаружения"]
-    вид, прошло = определить_вид(обнаружено, сейчас)
-    замечания = []
-    if вид == "первичное" and сведения.get("расследование завершено"):
-        замечания.append("Расследование уже завершено — можно сразу подготовить и дополнительное уведомление.")
-    if вид == "дополнительное":
-        if прошло > СРОК_ДОПОЛНИТЕЛЬНОГО_ЧАСОВ:
-            замечания.append(f"Срок 72 часа пропущен (прошло {прошло:.0f} ч) — возможен штраф по ст. 13.11 ч. 11 КоАП РФ.")
-        замечания.append("Если первичное уведомление не направлялось в срок 24 часа, срок нарушен.")
-    if вид == "дополнительное" and not сведения.get("расследование завершено"):
-        замечания.append("Расследование не завершено — в уведомлении указано, что результаты будут направлены дополнительно.")
-    с = open(ШАБЛОН, encoding="utf-8").read()
-    текст = с.format(
-        вид_уведомления=f"{вид} (прошло {прошло:.1f} ч с обнаружения)",
-        дата_обнаружения=обнаружено.strftime("%d.%m.%Y %H:%M"),
-        число_людей=f"{сведения['число пострадавших людей']:,}".replace(",", " "),
-        виды_данных=", ".join(сведения["виды данных"]),
-        причина=сведения["причина утечки"],
-        меры=сведения["принятые меры"],
-        расследование="завершено" if сведения.get("расследование завершено") else "проводится",
-        ответственный=ответственный)
-    if замечания:
-        текст += "\nСлужебные замечания (не для отправки): " + " ".join(замечания) + "\n"
-    os.makedirs(os.path.dirname(os.path.abspath(путь_к_файлу)), exist_ok=True)
-    with open(путь_к_файлу, "w", encoding="utf-8") as ф:
-        ф.write(текст)
-    return {"вид": вид, "прошло часов": прошло, "замечания": замечания, "путь": путь_к_файлу}
+def create_notification(details, file_path, now=None, responsible="Лисицына Анна Валерьевна"):
+    """Creates the notification file. Returns the notification kind and a list of deadline remarks."""
+    now = now or datetime.now()
+    detected = details["дата и время обнаружения"]
+    kind, elapsed = determine_kind(detected, now)
+    remarks = []
+    if kind == "первичное" and details.get("расследование завершено"):
+        remarks.append("Расследование уже завершено — можно сразу подготовить и дополнительное уведомление.")
+    if kind == "дополнительное":
+        if elapsed > FOLLOWUP_DEADLINE_HOURS:
+            remarks.append(f"Срок 72 часа пропущен (прошло {elapsed:.0f} ч) — возможен штраф по ст. 13.11 ч. 11 КоАП РФ.")
+        remarks.append("Если первичное уведомление не направлялось в срок 24 часа, срок нарушен.")
+    if kind == "дополнительное" and not details.get("расследование завершено"):
+        remarks.append("Расследование не завершено — в уведомлении указано, что результаты будут направлены дополнительно.")
+    c = open(TEMPLATE, encoding="utf-8").read()
+    text = c.format(
+        notification_type=f"{kind} (прошло {elapsed:.1f} ч с обнаружения)",
+        detection_date=detected.strftime("%d.%m.%Y %H:%M"),
+        people_count=f"{details['число пострадавших людей']:,}".replace(",", " "),
+        data_kinds=", ".join(details["виды данных"]),
+        cause=details["причина утечки"],
+        measures=details["принятые меры"],
+        investigation="завершено" if details.get("расследование завершено") else "проводится",
+        responsible=responsible)
+    if remarks:
+        text += "\nСлужебные замечания (не для отправки): " + " ".join(remarks) + "\n"
+    os.makedirs(os.path.dirname(os.path.abspath(file_path)), exist_ok=True)
+    with open(file_path, "w", encoding="utf-8") as f:
+        f.write(text)
+    return {"вид": kind, "прошло часов": elapsed, "замечания": remarks, "путь": file_path}
 
 
 if __name__ == "__main__":
-    print(создать_уведомление(
+    print(create_notification(
         {"дата и время обнаружения": datetime(2026, 10, 25, 9, 0), "число пострадавших людей": 5000,
          "виды данных": ["иные"], "причина утечки": "ошибка конфигурации", "принятые меры": "доступ закрыт",
-         "расследование завершено": False}, os.path.join(КОРЕНЬ, "reports", "sample_notification.txt")))
+         "расследование завершено": False}, os.path.join(ROOT, "reports", "sample_notification.txt")))

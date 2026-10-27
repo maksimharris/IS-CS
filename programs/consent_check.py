@@ -1,110 +1,110 @@
 # -*- coding: utf-8 -*-
-"""Задание 2.2. Проверка текстов согласий на обработку персональных данных."""
+"""Task 2.2. Checking consent texts for personal data processing."""
 import os
 import re
 
-КОРЕНЬ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-ПАПКА_ДОКУМЕНТОВ = os.path.join(КОРЕНЬ, "data", "documents")
-ФАЙЛ_ОТЧЁТА = os.path.join(КОРЕНЬ, "reports", "consent_report.txt")
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+DOCUMENTS_DIR = os.path.join(ROOT, "data", "documents")
+REPORT_FILE = os.path.join(ROOT, "reports", "consent_report.txt")
 
-# Признаки того, что согласие «вшито» в другой документ (ст. 9 ч. 1 152-ФЗ: согласие — отдельный документ)
-ФРАЗЫ_ВШИТОГО_СОГЛАСИЯ = [
+# Signs that the consent is embedded in another document (Art. 9 p. 1 of 152-FZ: consent is a separate document)
+EMBEDDED_CONSENT_PHRASES = [
     r"договор", r"оферт", r"пользовательск\w+ соглашени", r"условия использования",
     r"настоящим договором", r"в рамках соглашения", r"принимая условия",
 ]
 
-# Обязательные смысловые части: название -> шаблоны поиска
-ОБЯЗАТЕЛЬНЫЕ_ЧАСТИ = {
+# Mandatory semantic parts: name -> search patterns
+REQUIRED_PARTS = {
     "конкретные цели обработки": [r"цел[ьи]\w*\s+обработк", r"\bцел[ьи]\b"],
     "конкретный перечень данных": [r"перечень\s+данных", r"перечень\s+персональных"],
     "срок действия согласия": [r"срок\s+действия", r"согласие\s+действует"],
     "порядок отзыва": [r"отзыв", r"отозвать"],
 }
-РАЗМЫТЫЕ_ФОРМУЛИРОВКИ = [r"в\s+любых\s+целях", r"любые\s+цели", r"иные\s+цели", r"любые\s+данные", r"бессрочно"]
+VAGUE_PHRASES = [r"в\s+любых\s+целях", r"любые\s+цели", r"иные\s+цели", r"любые\s+данные", r"бессрочно"]
 
-ШТРАФ_ЗА_ВШИТОЕ = 300_000
-ШТРАФ_ЗА_ЧАСТЬ = 100_000
-МАКС_ШТРАФ = 700_000
+EMBEDDED_FINE = 300_000
+MISSING_PART_FINE = 100_000
+MAX_FINE = 700_000
 
 
-def проверить_согласие(текст, вид_документа):
-    """Возвращает словарь: правильный ли документ, чего не хватает, штраф, пояснение.
+def check_consent(text, document_kind):
+    """Returns a dict: whether the document is correct, what is missing, the fine, an explanation.
 
     вид_документа — «работник» или «клиент».
     """
-    if вид_документа not in ("работник", "клиент"):
+    if document_kind not in ("работник", "клиент"):
         raise ValueError("вид документа должен быть «работник» или «клиент»")
-    нижний = текст.lower()
-    нехватает = []
-    штраф = 0
+    lowered = text.lower()
+    missing_parts = []
+    fine = 0
 
-    вшито = [ф for ф in ФРАЗЫ_ВШИТОГО_СОГЛАСИЯ if re.search(ф, нижний)]
-    if вшито:
-        штраф += ШТРАФ_ЗА_ВШИТОЕ
-        нехватает.append("отдельность документа (согласие отсылает к договору/оферте)")
+    embedded = [f for f in EMBEDDED_CONSENT_PHRASES if re.search(f, lowered)]
+    if embedded:
+        fine += EMBEDDED_FINE
+        missing_parts.append("отдельность документа (согласие отсылает к договору/оферте)")
 
-    for часть, образцы in ОБЯЗАТЕЛЬНЫЕ_ЧАСТИ.items():
-        if not any(re.search(о, нижний) for о in образцы):
-            нехватает.append(часть)
-            штраф += ШТРАФ_ЗА_ЧАСТЬ
-    if any(re.search(р, нижний) for р in РАЗМЫТЫЕ_ФОРМУЛИРОВКИ):
-        нехватает.append("конкретность формулировок (найдены размытые обороты)")
-        штраф += ШТРАФ_ЗА_ЧАСТЬ
+    for part, patterns_list in REQUIRED_PARTS.items():
+        if not any(re.search(o, lowered) for o in patterns_list):
+            missing_parts.append(part)
+            fine += MISSING_PART_FINE
+    if any(re.search(res, lowered) for res in VAGUE_PHRASES):
+        missing_parts.append("конкретность формулировок (найдены размытые обороты)")
+        fine += MISSING_PART_FINE
 
-    # Особенность вида: согласие клиента лаборатории должно прямо упоминать биометрические данные
-    if вид_документа == "клиент" and not re.search(r"биометрическ|геном|днк", нижний):
-        нехватает.append("указание на биометрические (геномные) данные")
-        штраф += ШТРАФ_ЗА_ЧАСТЬ
-    if вид_документа == "работник" and not re.search(r"подпис", нижний):
-        нехватает.append("подпись субъекта")
-        штраф += ШТРАФ_ЗА_ЧАСТЬ
+    # Kind-specific rule: a laboratory client consent must explicitly mention biometric data
+    if document_kind == "клиент" and not re.search(r"биометрическ|геном|днк", lowered):
+        missing_parts.append("указание на биометрические (геномные) данные")
+        fine += MISSING_PART_FINE
+    if document_kind == "работник" and not re.search(r"подпис", lowered):
+        missing_parts.append("подпись субъекта")
+        fine += MISSING_PART_FINE
 
-    штраф = min(штраф, МАКС_ШТРАФ)
-    правильный = not нехватает
-    if правильный:
-        состояние, пояснение = "в порядке", "Документ отдельный, содержит цели, перечень данных, срок и порядок отзыва."
+    fine = min(fine, MAX_FINE)
+    correct = not missing_parts
+    if correct:
+        state, explanation = "в порядке", "Документ отдельный, содержит цели, перечень данных, срок и порядок отзыва."
     else:
-        состояние = "грубая ошибка" if вшито or len(нехватает) >= 3 else "замечание"
-        пояснение = ("Нарушены требования ст. 9 ч. 4 152-ФЗ (возможный штраф по ст. 13.11 ч. 1–2 КоАП РФ). "
-                     "Не хватает: " + "; ".join(нехватает) + ".")
+        state = "грубая ошибка" if embedded or len(missing_parts) >= 3 else "замечание"
+        explanation = ("Нарушены требования ст. 9 ч. 4 152-ФЗ (возможный штраф по ст. 13.11 ч. 1–2 КоАП РФ). "
+                     "Не хватает: " + "; ".join(missing_parts) + ".")
     return {
-        "документ правильный": правильный,
-        "состояние": состояние,
-        "не хватает частей": нехватает,
-        "размер возможного штрафа в рублях": штраф,
-        "пояснение": пояснение,
+        "документ правильный": correct,
+        "состояние": state,
+        "не хватает частей": missing_parts,
+        "размер возможного штрафа в рублях": fine,
+        "пояснение": explanation,
     }
 
 
-def вид_по_имени_файла(имя):
-    return "работник" if "employee" in имя else "клиент"
+def kind_from_filename(name):
+    return "работник" if "employee" in name else "клиент"
 
 
-def проверить_все_согласия(папка=ПАПКА_ДОКУМЕНТОВ):
-    """Обрабатывает все файлы-согласия в папке (имя содержит «согласие»)."""
-    итог = {}
-    for имя in sorted(os.listdir(папка)):
-        if имя.endswith(".txt") and "consent" in имя:
-            with open(os.path.join(папка, имя), encoding="utf-8") as ф:
-                итог[имя] = проверить_согласие(ф.read(), вид_по_имени_файла(имя))
-    return итог
+def check_all_consents(folder=DOCUMENTS_DIR):
+    """Processes all consent files in the folder (the name contains consent)."""
+    summary = {}
+    for name in sorted(os.listdir(folder)):
+        if name.endswith(".txt") and "consent" in name:
+            with open(os.path.join(folder, name), encoding="utf-8") as f:
+                summary[name] = check_consent(f.read(), kind_from_filename(name))
+    return summary
 
 
-def главная():
-    результаты = проверить_все_согласия()
-    строки = ["ОТЧЁТ ПО СОГЛАСИЯМ", "=" * 40]
-    for имя, р in результаты.items():
-        строки += [f"Файл: {имя}",
-                   f"  Правильный: {'да' if р['документ правильный'] else 'нет'} ({р['состояние']})",
-                   f"  Не хватает: {', '.join(р['не хватает частей']) or '—'}",
-                   f"  Возможный штраф: {р['размер возможного штрафа в рублях']:,} руб.".replace(",", " "),
-                   f"  Пояснение: {р['пояснение']}", ""]
-    текст = "\n".join(строки)
-    print(текст)
-    os.makedirs(os.path.dirname(ФАЙЛ_ОТЧЁТА), exist_ok=True)
-    with open(ФАЙЛ_ОТЧЁТА, "w", encoding="utf-8") as ф:
-        ф.write(текст)
+def main():
+    results = check_all_consents()
+    lines = ["ОТЧЁТ ПО СОГЛАСИЯМ", "=" * 40]
+    for name, res in results.items():
+        lines += [f"Файл: {name}",
+                   f"  Правильный: {'да' if res['документ правильный'] else 'нет'} ({res['состояние']})",
+                   f"  Не хватает: {', '.join(res['не хватает частей']) or '—'}",
+                   f"  Возможный штраф: {res['размер возможного штрафа в рублях']:,} руб.".replace(",", " "),
+                   f"  Пояснение: {res['пояснение']}", ""]
+    text = "\n".join(lines)
+    print(text)
+    os.makedirs(os.path.dirname(REPORT_FILE), exist_ok=True)
+    with open(REPORT_FILE, "w", encoding="utf-8") as f:
+        f.write(text)
 
 
 if __name__ == "__main__":
-    главная()
+    main()

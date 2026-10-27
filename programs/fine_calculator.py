@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Задание 4.2. Расчёт административного штрафа (упрощённая модель ст. 13.11 КоАП РФ в ред. с 30.05.2025)."""
+"""Task 4.2. Administrative fine calculation (simplified model of Art. 13.11 of the Administrative Code, edition effective 30.05.2025)."""
 
-# вид нарушения -> (минимум, максимум, минимум при повторности, максимум при повторности, основание)
-ТАБЛИЦА = {
+# violation kind -> (minimum, maximum, minimum if repeated, maximum if repeated, basis)
+FINE_TABLE = {
     "утечка малого размера":   (3_000_000, 5_000_000, None, None, "ст. 13.11 ч. 12 КоАП РФ (1–10 тыс. субъектов)"),
     "утечка среднего размера":  (5_000_000, 10_000_000, None, None, "ст. 13.11 ч. 13 КоАП РФ (10–100 тыс. субъектов)"),
     "утечка крупного размера":  (10_000_000, 15_000_000, None, None, "ст. 13.11 ч. 14 КоАП РФ (свыше 100 тыс. субъектов)"),
@@ -10,37 +10,37 @@
     "нарушение по биометрии":   (10_000_000, 20_000_000, 20_000_000, 20_000_000, "ст. 13.11 ч. 4 КоАП РФ"),
     "нарушение по согласию":    (300_000, 700_000, 700_000, 1_500_000, "ст. 13.11 ч. 1–2 КоАП РФ"),
 }
-# Оборотный штраф за повторную утечку (с 30.05.2025): 1–3 % выручки, но не менее 20 млн и не более 500 млн руб.
-ОБОРОТНЫЕ_ВИДЫ = ("утечка малого размера", "утечка среднего размера", "утечка крупного размера", "нарушение по биометрии")
-ДОЛЯ_МИН, ДОЛЯ_МАКС = 0.01, 0.03
-ОБОРОТ_НИЖНИЙ_ПРЕДЕЛ, ОБОРОТ_ВЕРХНИЙ_ПРЕДЕЛ = 20_000_000, 500_000_000
+# Turnover fine for a repeated leak (since 30.05.2025): 1-3 % of revenue, not less than 20 mln and not more than 500 mln rubles.
+TURNOVER_KINDS = ("утечка малого размера", "утечка среднего размера", "утечка крупного размера", "нарушение по биометрии")
+SHARE_MIN, SHARE_MAX = 0.01, 0.03
+TURNOVER_LOWER_LIMIT, TURNOVER_UPPER_LIMIT = 20_000_000, 500_000_000
 
 
-def рассчитать_штраф(вид, число_людей, повторно, годовая_выручка):
-    """Возвращает: наименьший и наибольший штраф, применим ли оборотный штраф, правовое обоснование."""
-    if вид not in ТАБЛИЦА:
-        raise ValueError(f"Неизвестный вид нарушения: {вид}")
-    мин_, макс_, мин_п, макс_п, основание = ТАБЛИЦА[вид]
-    обоснование = [f"Базовая санкция: {основание}."]
-    наименьший, наибольший = мин_, макс_
-    # число людей: корректируем категорию утечки, если фактическое число больше заявленного вида
-    if вид.startswith("утечка") and число_людей < 1_000:
-        обоснование.append("Число субъектов менее 1000 — состав ч. 12–14 может не наступать, берётся нижняя категория.")
-    оборотный = False
-    if повторно:
-        if мин_п is not None:
-            наименьший, наибольший = мин_п, макс_п
-            обоснование.append("Повторность: применяется повышенная санкция.")
-        if вид in ОБОРОТНЫЕ_ВИДЫ:
-            оборотный = True
-            о_мин = min(max(годовая_выручка * ДОЛЯ_МИН, ОБОРОТ_НИЖНИЙ_ПРЕДЕЛ), ОБОРОТ_ВЕРХНИЙ_ПРЕДЕЛ)
-            о_макс = min(max(годовая_выручка * ДОЛЯ_МАКС, ОБОРОТ_НИЖНИЙ_ПРЕДЕЛ), ОБОРОТ_ВЕРХНИЙ_ПРЕДЕЛ)
-            наименьший, наибольший = max(наименьший, о_мин), max(наибольший, о_макс)
-            обоснование.append("Оборотный штраф с 30.05.2025: 1–3 % выручки за год (не менее "
+def calculate_fine(kind, people_count, repeat, annual_revenue):
+    """Returns: smallest and largest fine, whether the turnover fine applies, legal justification."""
+    if kind not in FINE_TABLE:
+        raise ValueError(f"Неизвестный вид нарушения: {kind}")
+    min_fine, max_fine, min_fine_repeat, max_fine_repeat, basis = FINE_TABLE[kind]
+    justification = [f"Базовая санкция: {basis}."]
+    smallest, largest = min_fine, max_fine
+    # number of people: adjust the leak category if the actual number differs from the declared kind
+    if kind.startswith("утечка") and people_count < 1_000:
+        justification.append("Число субъектов менее 1000 — состав ч. 12–14 может не наступать, берётся нижняя категория.")
+    turnover = False
+    if repeat:
+        if min_fine_repeat is not None:
+            smallest, largest = min_fine_repeat, max_fine_repeat
+            justification.append("Повторность: применяется повышенная санкция.")
+        if kind in TURNOVER_KINDS:
+            turnover = True
+            turnover_min = min(max(annual_revenue * SHARE_MIN, TURNOVER_LOWER_LIMIT), TURNOVER_UPPER_LIMIT)
+            turnover_max = min(max(annual_revenue * SHARE_MAX, TURNOVER_LOWER_LIMIT), TURNOVER_UPPER_LIMIT)
+            smallest, largest = max(smallest, turnover_min), max(largest, turnover_max)
+            justification.append("Оборотный штраф с 30.05.2025: 1–3 % выручки за год (не менее "
                                "20 млн и не более 500 млн руб.), ст. 13.11 КоАП РФ.")
-    return {"наименьший размер штрафа": int(наименьший), "наибольший размер штрафа": int(наибольший),
-            "оборотный штраф применим": оборотный, "правовое обоснование": " ".join(обоснование)}
+    return {"наименьший размер штрафа": int(smallest), "наибольший размер штрафа": int(largest),
+            "оборотный штраф применим": turnover, "правовое обоснование": " ".join(justification)}
 
 
 if __name__ == "__main__":
-    print(рассчитать_штраф("утечка крупного размера", 300_000, True, 840_000_000))
+    print(calculate_fine("утечка крупного размера", 300_000, True, 840_000_000))

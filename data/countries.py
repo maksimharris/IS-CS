@@ -1,8 +1,8 @@
 # -*- coding: utf-8 -*-
-"""Справочник стран для трансграничной передачи. Ключ — код ISO 3166-1 alpha-2.
-Перед защитой сверьте ссылки с актуальной редакцией приказа на rkn.gov.ru."""
+"""Country reference for cross-border transfers. The key is an ISO 3166-1 alpha-2 code.
+Before the defence, check the references against the current edition of the order at rkn.gov.ru."""
 
-страны = {
+countries = {
     'DE': {
         "название страны": 'Германия',
         "достаточная защита по версии Роскомнадзора": False,

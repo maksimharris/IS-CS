@@ -1,81 +1,81 @@
 # -*- coding: utf-8 -*-
-"""Задание 3.3. Проверка заявок на трансграничную передачу."""
+"""Task 3.3. Checking cross-border transfer requests."""
 import os
 import sys
 from datetime import timedelta
 
-КОРЕНЬ = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-sys.path.insert(0, os.path.join(КОРЕНЬ, "data"))
-sys.path.insert(0, os.path.join(КОРЕНЬ, "programs"))
-from country_check import проверить_страну
-from transfer_requests import заявки
+ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+sys.path.insert(0, os.path.join(ROOT, "data"))
+sys.path.insert(0, os.path.join(ROOT, "programs"))
+from country_check import check_country
+from transfer_requests import requests
 
-ФАЙЛ_ОТЧЁТА = os.path.join(КОРЕНЬ, "reports", "transfer_report.txt")
-ОСОБЫЕ_ВИДЫ = ("специальные", "биометрические")
-
-
-def рабочих_дней_между(начало, конец):
-    """Число рабочих дней (пн–пт) после даты начала до даты конца включительно. Праздники не учитываются."""
-    дней, д = 0, начало
-    while д < конец:
-        д += timedelta(days=1)
-        if д.weekday() < 5:
-            дней += 1
-    return дней
+REPORT_FILE = os.path.join(ROOT, "reports", "transfer_report.txt")
+SPECIAL_KINDS = ("специальные", "биометрические")
 
 
-def проверить_заявку(заявка):
-    """Возвращает словарь с приговором и полным списком причин."""
-    причины = []
-    с = проверить_страну(заявка["страна-получатель"])
-    приговор = с["приговор"]
-    if приговор == "запрещено":
-        причины.append(f"Страна {с['название']}: передача запрещена. " + "; ".join(с["условия"]))
+def workdays_between(start, end):
+    """Number of working days (Mon-Fri) after the start date up to and including the end date. Holidays are not taken into account."""
+    days, doc = 0, start
+    while doc < end:
+        doc += timedelta(days=1)
+        if doc.weekday() < 5:
+            days += 1
+    return days
+
+
+def check_request(request):
+    """Returns a dict with the verdict and the full list of reasons."""
+    reasons = []
+    c = check_country(request["страна-получатель"])
+    verdict = c["приговор"]
+    if verdict == "запрещено":
+        reasons.append(f"Страна {c['название']}: передача запрещена. " + "; ".join(c["условия"]))
     else:
-        причины.append(f"Страна {с['название']}: {приговор}.")
+        reasons.append(f"Страна {c['название']}: {verdict}.")
 
-    # Уведомление Роскомнадзора и 10 рабочих дней
-    if not заявка["был ли уведомлён Роскомнадзор"]:
-        причины.append("Роскомнадзор не уведомлён (ст. 12 ч. 4 152-ФЗ) — передача невозможна.")
-        приговор = "запрещено"
+    # Roskomnadzor notification and 10 working days
+    if not request["был ли уведомлён Роскомнадзор"]:
+        reasons.append("Роскомнадзор не уведомлён (ст. 12 ч. 4 152-ФЗ) — передача невозможна.")
+        verdict = "запрещено"
     else:
-        прошло = рабочих_дней_между(заявка["дата уведомления"], заявка["текущая дата"])
-        if прошло < с["число дней ожидания"]:
-            причины.append(f"Прошло {прошло} раб. дн. из {с['число дней ожидания']} — ждать ещё "
-                           f"{с['число дней ожидания'] - прошло}.")
-            if приговор == "разрешено":
-                приговор = "разрешено при условиях"
+        elapsed = workdays_between(request["дата уведомления"], request["текущая дата"])
+        if elapsed < c["число дней ожидания"]:
+            reasons.append(f"Прошло {elapsed} раб. дн. из {c['число дней ожидания']} — ждать ещё "
+                           f"{c['число дней ожидания'] - elapsed}.")
+            if verdict == "разрешено":
+                verdict = "разрешено при условиях"
         else:
-            причины.append(f"Срок ожидания выдержан ({прошло} раб. дн.).")
+            reasons.append(f"Срок ожидания выдержан ({elapsed} раб. дн.).")
 
-    # Особые согласия
-    особые = [в for в in заявка["виды передаваемых данных"] if в in ОСОБЫЕ_ВИДЫ]
-    if особые and not заявка["есть ли согласие людей"]:
-        причины.append("Для видов данных " + ", ".join(особые) +
+    # Special consents
+    special = [kind_item for kind_item in request["виды передаваемых данных"] if kind_item in SPECIAL_KINDS]
+    if special and not request["есть ли согласие людей"]:
+        reasons.append("Для видов данных " + ", ".join(special) +
                        " нужно отдельное письменное согласие (ст. 10 ч. 1, ст. 11 ч. 1 152-ФЗ) — его нет.")
-        приговор = "запрещено"
-    elif особые:
-        причины.append("Особое согласие на " + ", ".join(особые) + " имеется; проверьте письменную форму.")
-    if not заявка["есть ли согласие людей"] and с["число дней ожидания"] > 0 and приговор != "запрещено":
-        причины.append("Для страны без адекватной защиты нужно письменное согласие на трансграничную передачу "
+        verdict = "запрещено"
+    elif special:
+        reasons.append("Особое согласие на " + ", ".join(special) + " имеется; проверьте письменную форму.")
+    if not request["есть ли согласие людей"] and c["число дней ожидания"] > 0 and verdict != "запрещено":
+        reasons.append("Для страны без адекватной защиты нужно письменное согласие на трансграничную передачу "
                        "(ст. 12 ч. 5 152-ФЗ) — его нет.")
-        приговор = "запрещено"
-    return {"номер": заявка["номер"], "страна": с["название"], "приговор": приговор,
-            "причины": причины, "условия": с["условия"]}
+        verdict = "запрещено"
+    return {"номер": request["номер"], "страна": c["название"], "приговор": verdict,
+            "причины": reasons, "условия": c["условия"]}
 
 
-def главная():
-    строки = ["ОТЧЁТ ПО ПЕРЕДАЧЕ ДАННЫХ ЗА ГРАНИЦУ", "=" * 40]
-    for з in заявки:
-        р = проверить_заявку(з)
-        строки += [f"Заявка №{р['номер']} → {р['страна']}: {р['приговор'].upper()}"] + \
-                  [f"  - {п}" for п in р["причины"]] + [""]
-    текст = "\n".join(строки)
-    print(текст)
-    os.makedirs(os.path.dirname(ФАЙЛ_ОТЧЁТА), exist_ok=True)
-    with open(ФАЙЛ_ОТЧЁТА, "w", encoding="utf-8") as ф:
-        ф.write(текст)
+def main():
+    lines = ["ОТЧЁТ ПО ПЕРЕДАЧЕ ДАННЫХ ЗА ГРАНИЦУ", "=" * 40]
+    for entry in requests:
+        res = check_request(entry)
+        lines += [f"Заявка №{res['номер']} → {res['страна']}: {res['приговор'].upper()}"] +\
+                  [f"  - {p}" for p in res["причины"]] + [""]
+    text = "\n".join(lines)
+    print(text)
+    os.makedirs(os.path.dirname(REPORT_FILE), exist_ok=True)
+    with open(REPORT_FILE, "w", encoding="utf-8") as f:
+        f.write(text)
 
 
 if __name__ == "__main__":
-    главная()
+    main()
